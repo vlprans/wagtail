@@ -38,7 +38,7 @@ class DBSearch(BaseSearch):
 
         # Get fields
         if fields is None:
-            fields = query_set.model._get_search_fields()[1].keys()
+            fields = query_set.model.get_search_fields(exclude_filter=True).keys()
 
         # Return nothing if there are no fields
         if not fields:

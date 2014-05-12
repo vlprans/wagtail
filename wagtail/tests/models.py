@@ -6,7 +6,6 @@ from wagtail.wagtailadmin.edit_handlers import FieldPanel, MultiFieldPanel, Inli
 from wagtail.wagtailimages.edit_handlers import ImageChooserPanel
 from wagtail.wagtaildocs.edit_handlers import DocumentChooserPanel
 from wagtail.wagtailforms.models import AbstractEmailForm, AbstractFormField
-from wagtail.wagtailsearch import Indexed
 
 
 EVENT_AUDIENCE_CHOICES = (
@@ -214,22 +213,3 @@ FormPage.content_panels = [
         FieldPanel('subject', classname="full"),
     ], "Email")
 ]
-
-
-# For testing search
-class SearchTest(models.Model, Indexed):
-    title = models.CharField(max_length=255)
-    content = models.TextField()
-    live = models.BooleanField(default=False)
-    published_date = models.DateField(null=True)
-
-    search_fields = ('title', 'content', 'callable_indexed_field')
-
-    def callable_indexed_field(self):
-        return "Callable"
-
-
-class SearchTestChild(SearchTest):
-    extra_content = models.TextField()
-
-    search_fields = 'extra_content'
