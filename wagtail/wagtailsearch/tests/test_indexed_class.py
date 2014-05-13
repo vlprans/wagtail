@@ -67,6 +67,20 @@ class TestGetSearchFields(TestCase):
 
         # Check
         expected_result = {
+            'searchtest_ptr': {
+                'filter': True,
+                'search': False,
+                'type': 'OneToOneField',
+                'attname': 'searchtest_ptr_id'
+            },
+            'extra_content': {
+                'filter': False,
+                'search': True,
+                'type': 'TextField',
+                'attname': 'extra_content'
+            },
+
+            # Inherited
             'live': {
                 'filter': True,
                 'search': False,
@@ -95,20 +109,6 @@ class TestGetSearchFields(TestCase):
                 'type': 'DateField',
                 'attname': 'published_date'
             },
-
-            # Inherited
-            'searchtest_ptr': {
-                'filter': True,
-                'search': False,
-                'type': 'OneToOneField',
-                'attname': 'searchtest_ptr_id'
-            },
-            'extra_content': {
-                'filter': False,
-                'search': True,
-                'type': 'TextField',
-                'attname': 'extra_content'
-            }
         }
 
         self.assertDictEqual(search_fields, expected_result)
@@ -130,7 +130,7 @@ class TestGetSearchFields(TestCase):
                 'search': True,
                 'type': 'TextField',
                 'attname': 'extra_content'
-            }
+            },
         }
 
         self.assertDictEqual(search_fields, expected_result)
@@ -156,7 +156,7 @@ class TestGetSearchFields(TestCase):
                 'search': True,
                 'type': 'TextField',
                 'attname': 'content'
-            }
+            },
         }
 
         self.assertDictEqual(search_fields, expected_result)
@@ -190,7 +190,7 @@ class TestGetSearchFields(TestCase):
                 'search': False,
                 'type': 'DateField',
                 'attname': 'published_date'
-            }
+            },
         }
 
         self.assertDictEqual(search_fields, expected_result)
@@ -203,7 +203,7 @@ class TestIndexedFieldsBackwardsCompatibility(TestCase):
     def test_indexed_fields_backwards_compatibility(self):
         # Get search fields
         search_fields = models.SearchTestOldConfig.get_search_fields()
-        
+
         # Check
         expected_result = {
             'id': {
@@ -219,10 +219,10 @@ class TestIndexedFieldsBackwardsCompatibility(TestCase):
             'title': {
                 'search': True,
                 'filter': False,
-                'predictive': True,
+                'partial_match': True,
                 'boost': 100,
                 'es_extra': {'type': 'string'}
-            }
+            },
         }
 
         self.assertDictEqual(search_fields, expected_result)
@@ -246,7 +246,7 @@ class TestIndexedFieldsBackwardsCompatibility(TestCase):
             'content': {
                 'search': True,
                 'filter': False,
-            }
+            },
         }
 
         self.assertDictEqual(search_fields, expected_result)
