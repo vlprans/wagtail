@@ -1,71 +1,38 @@
 from __future__ import absolute_import
 
-import string
-
 from django.db import models
 
 from elasticsearch import Elasticsearch, NotFoundError, RequestError
 from elasticsearch.helpers import bulk
 
-from wagtail.wagtailsearch.backends.base import BaseSearch
+from wagtail.wagtailsearch.backends.base import BaseSearch, BaseSearchResults
 from wagtail.wagtailsearch.indexed import Indexed
 
 from .query import ElasticSearchQuery
 from .document import ElasticSearchField, ElasticSearchType, ElasticSearchDocument
 
 
-class ElasticSearchResults(object):
+class ElasticSearchResults(BaseSearchResults):
     """
     This represents a lazy set of results from running a query on an ElasticSearch backend.
-
-    It's designed to work in a very similar way to Django QuerySets.
     """
-    def __init__(self, backend, query):
-        self.backend = backend
-        self.query = query
-        self.start = 0
-        self.stop = None
-        self._results_cache = None
-        self._hit_count = None
+    def __init__(self, *args, **kwargs):
+        self._query = None
+        super(ElasticSearchResults, self).__init__(*args, **kwargs)
 
     def _clone(self):
-        klass = self.__class__
-        new = klass(self.backend, self.query._clone())
-        new.start = self.start
-        new.stop = self.stop
+        new = super(ElasticSearchResults, self)._clone()
+        new._query = self._query
         return new
 
-    def _get_pks(self):
-        """
-        This gets a list of primary keys for the results of this query ordered
-        by relevance.
-        """
-        # Get query
-        query = self.query.to_es()
-
-        # Params for elasticsearch query
-        params = dict(
-            index=self.backend.es_index,
-            body=dict(query=query),
-            _source=False,
-            fields='pk',
-            from_=self.start,
-        )
-
-        # Add size if set
-        if self.stop is not None:
-            params['size'] = self.stop - self.start
-
-        # Send to ElasticSearch
-        hits = self.backend.es.search(**params)
-
-        # Get pks from results
-        pks = [hit['fields']['pk'] for hit in hits['hits']['hits']]
-
-        # ElasticSearch 1.x likes to pack pks into lists, unpack them if this has happened
-        return [pk[0] if isinstance(pk, list) else pk for pk in pks]
+    @property
+    def query(self):
+        if self._query is None:
+            self._query = ElasticSearchQuery(self.queryset, self.query_string, self.fields)
+        return self._query
 
     def _do_count(self):
+        # Get query
         query = self.query.to_es()
 
         # Elasticsearch 1.x
@@ -91,101 +58,50 @@ class ElasticSearchResults(object):
 
         return max(hit_count, 0)
 
-    def count(self):
-        """
-        This performs an Elastic search count query which returns how many
-        results would be returned if this query was run for real.
-        """
-        if self._hit_count is None:
-            if self._results_cache is not None:
-                self._hit_count = len(self._results_cache)
-            else:
-                self._hit_count = self._do_count()
-        return self._hit_count
-
     def _do_search(self):
-        # Get list of PKs from ElasticSearch
-        pks = self._get_pks()
+        # Get query
+        query = self.query.to_es()
+
+        # Params for elasticsearch query
+        params = dict(
+            index=self.backend.es_index,
+            body=dict(query=query),
+            _source=False,
+            fields='pk',
+            from_=self.start,
+        )
+
+        # Add size if set
+        if self.stop is not None:
+            params['size'] = self.stop - self.start
+
+        # Send to ElasticSearch
+        hits = self.backend.es.search(**params)
+
+        # Get pks from results
+        pks = [hit['fields']['pk'] for hit in hits['hits']['hits']]
+
+        # ElasticSearch 1.x likes to pack pks into lists, unpack them if this has happened
+        pks = [pk[0] if isinstance(pk, list) else pk for pk in pks]
 
         # Initialise results dictionary
         results = dict((str(pk), None) for pk in pks)
 
         # Find objects in database and add them to dict
-        query_set = self.query.query_set.filter(pk__in=pks)
-        for obj in query_set:
+        queryset = self.queryset.filter(pk__in=pks)
+        for obj in queryset:
             results[str(obj.pk)] = obj
 
         # Return results in order given by ElasticSearch
         return [results[str(pk)] for pk in pks if results[str(pk)]]
-
-    def _fetch_all(self):
-        """
-        This fetches all the results as a list of Django objects
-        """
-        if self._results_cache is None:
-            self._results_cache = self._do_search()
-        return self._results_cache
-
-    def _set_limits(self, start=None, stop=None):
-        if stop is not None:
-            if self.stop is not None:
-                self.stop = min(self.stop, self.start + stop)
-            else:
-                self.stop = self.start + stop
-
-        if start is not None:
-            if self.stop is not None:
-                self.start = min(self.stop, self.start + start)
-            else:
-                self.start = self.start + start
-
-    def __getitem__(self, key):
-        new = self._clone()
-
-        if isinstance(key, slice):
-            # Set limits
-            start = int(key.start) if key.start else None
-            stop = int(key.stop) if key.stop else None
-            new._set_limits(start, stop)
-
-            # Copy results cache
-            if self._results_cache is not None:
-                new._results_cache = self._results_cache[key]
-
-            return new
-        else:
-            # Return a single item
-            if self._results_cache is not None:
-                return self._results_cache[key]
-
-            new.start = key
-            new.stop = key + 1
-            return list(new)[0]
-  
-    def __repr__(self):
-        data = list(self[:21])
-        if len(data) > 20:
-            data[-1] = "...(remaining elements truncated)..."
-        return repr(data)
-
-    def __iter__(self):
-        """
-        Runs the query and returns an iterator for the results.
-        """
-        return iter(self._fetch_all())
-  
-    def __len__(self):
-        """
-        This runs the query and returns the amount of results returned
-        This method may be very slow for large queries.
-        """
-        return len(self._fetch_all())
 
 
 class ElasticSearch(BaseSearch):
     """
     This represents a connection to an instance of ElasticSearch.
     """
+    results_class = ElasticSearchResults
+
     def __init__(self, params):
         super(ElasticSearch, self).__init__(params)
 
@@ -363,23 +279,3 @@ class ElasticSearch(BaseSearch):
             )
         except NotFoundError:
             pass  # Document doesn't exist, ignore this exception
-
-    def search(self, query_set, query_string, fields=None):
-        """
-        This runs a search query on the index.
-        Returns an ElasticSearchResults object.
-        """
-        # Model must be a descendant of Indexed
-        if not issubclass(query_set.model, Indexed):
-            return query_set.none()
-
-        # Clean up query string
-        if query_string is not None:
-            query_string = "".join([c for c in query_string if c not in string.punctuation])
-
-        # Don't search using blank query strings (this upsets ElasticSearch)
-        if query_string == "":
-            return query_set.none()
-
-        # Return search results
-        return ElasticSearchResults(self, ElasticSearchQuery(query_set, query_string, fields=fields))

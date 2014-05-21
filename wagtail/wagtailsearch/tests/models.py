@@ -8,7 +8,11 @@ class SearchTest(models.Model, Indexed):
     live = models.BooleanField(default=False)
     published_date = models.DateField(null=True)
 
-    search_fields = ['title', 'content', 'callable_indexed_field']
+    search_fields = {
+        'title': dict(partial_match=True),
+        'content': dict(),
+        'callable_indexed_field': dict()
+    }
     search_filter_fields = ['title', 'live', 'published_date']
 
     def callable_indexed_field(self):
@@ -16,9 +20,13 @@ class SearchTest(models.Model, Indexed):
 
 
 class SearchTestChild(SearchTest):
+    subtitle = models.CharField(max_length=255, null=True, blank=True)
     extra_content = models.TextField()
 
-    search_fields = ['extra_content']
+    search_fields = {
+        'subtitle': dict(partial_match=True),
+        'extra_content': dict(),
+    }
 
 
 class SearchTestOldConfig(models.Model, Indexed):

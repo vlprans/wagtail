@@ -1,4 +1,5 @@
 from .document import ElasticSearchType
+import json
 
 
 class FilterError(Exception):
@@ -16,22 +17,11 @@ class ElasticSearchQuery(object):
     These queries combine the filters from a Django QuerySet with a query string and
     produce the JSON Query DSL code to be run on an ElasticSearch backend.
     """
-    def __init__(self, query_set, query_string, fields=None, _es_type=None):
-        self.query_set = query_set
+    def __init__(self, queryset, query_string, fields=None):
+        self.queryset = queryset
         self.query_string = query_string
-        self.fields = fields
-
-        # Check if _es_type was provided and use if if so.
-        # ElasticSearchType objects take a lot of work to create
-        # so we should only make them when we need to.
-        if _es_type is not None:
-            self._es_type = _es_type
-        else:
-            self._es_type = ElasticSearchType(self.query_set.model)
-
-    def _clone(self):
-        klass = self.__class__
-        return klass(self.query_set, self.query_string, fields=self.fields, _es_type=self._es_type)
+        self.fields = fields or ['_all', 'partials']
+        self._es_type = ElasticSearchType(self.queryset.model)
 
     def _get_filters_from_where(self, where_node):
         """
@@ -149,14 +139,14 @@ class ElasticSearchQuery(object):
         # Filter by content type
         filters.append({
             'prefix': {
-                'content_type': self.query_set.model._get_qualified_content_type_name()
+                'content_type': self.queryset.model._get_qualified_content_type_name()
             }
         })
 
         # Apply filters from queryset
-        query_set_filters = self._get_filters_from_where(self.query_set.query.where)
-        if query_set_filters:
-            filters.append(query_set_filters)
+        queryset_filters = self._get_filters_from_where(self.queryset.query.where)
+        if queryset_filters:
+            filters.append(queryset_filters)
 
         return filters
 
@@ -171,14 +161,14 @@ class ElasticSearchQuery(object):
                     'query': self.query_string,
                 }
             }
+
+            # Fields
+            if self.fields:
+                query['query_string']['fields'] = self.fields
         else:
             query = {
                 'match_all': {}
             }
-
-        # Fields
-        if self.fields:
-            query['query_string']['fields'] = self.fields
 
         # Filters
         filters = self._get_filters()
@@ -200,3 +190,6 @@ class ElasticSearchQuery(object):
             }
 
         return query
+
+    def __repr__(self):
+        return json.dumps(self.to_es())
