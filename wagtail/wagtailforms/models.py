@@ -1,5 +1,3 @@
-from django.conf import settings
-from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.shortcuts import render
 from django.utils.translation import ugettext_lazy as _
@@ -9,9 +7,9 @@ from unidecode import unidecode
 import json
 import re
 
-from wagtail.wagtailcore.models import PageBase, Page, Orderable, UserPagePermissionsProxy
+from wagtail.wagtailcore.models import Page, Orderable, UserPagePermissionsProxy, get_page_types
 from wagtail.wagtailadmin.edit_handlers import FieldPanel
-from wagtail.wagtailforms.backends.email import EmailFormProcessor
+from wagtail.wagtailadmin import tasks
 
 from .forms import FormBuilder
 
@@ -79,11 +77,11 @@ class AbstractFormField(Orderable):
 
     panels = [
         FieldPanel('label'),
-        FieldPanel('field_type'),
-        FieldPanel('required'),
-        FieldPanel('choices'),
-        FieldPanel('default_value'),
         FieldPanel('help_text'),
+        FieldPanel('required'),
+        FieldPanel('field_type', classname="formbuilder-type"),
+        FieldPanel('choices', classname="formbuilder-choices"),
+        FieldPanel('default_value', classname="formbuilder-default"),
     ]
 
     class Meta:
@@ -91,15 +89,14 @@ class AbstractFormField(Orderable):
         ordering = ['sort_order']
 
 
-FORM_MODEL_CLASSES = []
-_FORM_CONTENT_TYPES = []
-
+_FORM_CONTENT_TYPES = None
 
 def get_form_types():
     global _FORM_CONTENT_TYPES
-    if len(_FORM_CONTENT_TYPES) != len(FORM_MODEL_CLASSES):
+    if _FORM_CONTENT_TYPES is None:
         _FORM_CONTENT_TYPES = [
-            ContentType.objects.get_for_model(cls) for cls in FORM_MODEL_CLASSES
+            ct for ct in get_page_types()
+            if issubclass(ct.model_class(), AbstractForm)
         ]
     return _FORM_CONTENT_TYPES
 
@@ -110,23 +107,8 @@ def get_forms_for_user(user):
     return editable_pages.filter(content_type__in=get_form_types())
 
 
-class FormBase(PageBase):
-    """Metaclass for Forms"""
-    def __init__(cls, name, bases, dct):
-        super(FormBase, cls).__init__(name, bases, dct)
-
-        if not cls.is_abstract:
-            # register this type in the list of page content types
-            FORM_MODEL_CLASSES.append(cls)
-            # Check if form_processing_backend is ok
-            if hasattr(cls, 'form_processing_backend'):
-                cls.form_processing_backend.validate_usage(cls)
-
-
 class AbstractForm(Page):
     """A Form Page. Pages implementing a form should inhert from it"""
-
-    __metaclass__ = FormBase
 
     form_builder = FormBuilder
     is_abstract = True  # Don't display me in "Add"
@@ -140,29 +122,35 @@ class AbstractForm(Page):
     class Meta:
         abstract = True
 
+    def get_form_parameters(self):
+        return {}
+
+    def process_form_submission(self, form):
+        # remove csrf_token from form.data
+        form_data = dict(
+            i for i in form.data.items()
+            if i[0] != 'csrfmiddlewaretoken'
+        )
+
+        FormSubmission.objects.create(
+            form_data=json.dumps(form_data),
+            page=self,
+        )
+
     def serve(self, request):
         fb = self.form_builder(self.form_fields.all())
         form_class = fb.get_form_class()
+        form_params = self.get_form_parameters()
 
         if request.method == 'POST':
-            self.form = form_class(request.POST)
+            form = form_class(request.POST, **form_params)
 
-            if self.form.is_valid():
-                # remove csrf_token from form.data
-                form_data = dict(
-                    i for i in self.form.data.items()
-                    if i[0] != 'csrfmiddlewaretoken'
-                )
-
-                FormSubmission.objects.create(
-                    form_data=json.dumps(form_data),
-                    page=self,
-                )
-
+            if form.is_valid():
+                self.process_form_submission(form)
                 # If we have a form_processing_backend call its process method
                 if hasattr(self, 'form_processing_backend'):
                     form_processor = self.form_processing_backend()
-                    form_processor.process(self, self.form)
+                    form_processor.process(self, form)
 
                 # render the landing_page
                 # TODO: It is much better to redirect to it
@@ -170,11 +158,11 @@ class AbstractForm(Page):
                     'self': self,
                 })
         else:
-            self.form = form_class()
+            form = form_class(**form_params)
 
         return render(request, self.template, {
             'self': self,
-            'form': self.form,
+            'form': form,
         })
 
     def get_page_modes(self):
@@ -195,11 +183,18 @@ class AbstractForm(Page):
 class AbstractEmailForm(AbstractForm):
     """A Form Page that sends email. Pages implementing a form to be send to an email should inherit from it"""
     is_abstract = True  # Don't display me in "Add"
-    form_processing_backend = EmailFormProcessor
 
     to_address = models.CharField(max_length=255, blank=True, help_text=_("Optional - form submissions will be emailed to this address"))
     from_address = models.CharField(max_length=255, blank=True)
     subject = models.CharField(max_length=255, blank=True)
+
+    def process_form_submission(self, form):
+        super(AbstractEmailForm, self).process_form_submission(form)
+
+        if self.to_address:
+            content = '\n'.join([x[1].label + ': ' + form.data.get(x[0]) for x in form.fields.items()])
+            tasks.send_email_task.delay(self.subject, content, [self.to_address], self.from_address,)
+
 
     class Meta:
         abstract = True
