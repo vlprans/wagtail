@@ -1,6 +1,6 @@
 from django.conf.urls import include, url
 
-from wagtail.wagtailadmin import hooks
+from wagtail.wagtailcore import hooks
 from wagtail.wagtailsearch.urls import admin as admin_urls
 
 

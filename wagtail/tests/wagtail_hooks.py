@@ -1,4 +1,4 @@
-from wagtail.wagtailadmin import hooks
+from wagtail.wagtailcore import hooks
 
 def editor_css():
     return """<link rel="stylesheet" href="/path/to/my/custom.css">"""

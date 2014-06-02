@@ -1,7 +1,7 @@
 from django.shortcuts import render
 
 from wagtail.wagtailadmin.userbar import EditPageItem, AddPageItem, ApproveModerationEditPageItem, RejectModerationEditPageItem
-from wagtail.wagtailadmin import hooks
+from wagtail.wagtailcore import hooks
 from wagtail.wagtailcore.models import Page, PageRevision
 
 def for_frontend(request, page_id):

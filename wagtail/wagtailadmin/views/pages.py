@@ -10,8 +10,9 @@ from django.views.decorators.vary import vary_on_headers
 
 from wagtail.wagtailadmin.edit_handlers import TabbedInterface, ObjectList
 from wagtail.wagtailadmin.forms import SearchForm
-from wagtail.wagtailadmin import tasks, hooks
+from wagtail.wagtailadmin import tasks
 
+from wagtail.wagtailcore import hooks
 from wagtail.wagtailcore.models import Page, PageRevision, get_page_types
 
 
