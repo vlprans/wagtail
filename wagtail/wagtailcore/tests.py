@@ -6,7 +6,7 @@ from StringIO import StringIO
 from django.contrib.auth.models import User
 
 from wagtail.wagtailcore.models import Page, Site, UserPagePermissionsProxy
-from wagtail.tests.models import EventPage, EventIndex, SimplePage
+from wagtail.tests.models import EventPage, EventIndex, SimplePage, PageWithOldStyleRouteMethod
 
 
 class TestRouting(TestCase):
@@ -74,7 +74,13 @@ class TestRouting(TestCase):
 
         request = HttpRequest()
         request.path = '/events/christmas/'
-        response = homepage.route(request, ['events', 'christmas'])
+        found_page = homepage.route(request, ['events', 'christmas'])
+        self.assertEqual(found_page, christmas_page)
+
+    def test_request_serving(self):
+        christmas_page = EventPage.objects.get(url_path='/home/events/christmas/')
+        request = HttpRequest()
+        response = christmas_page.serve(request)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context_data['self'], christmas_page)
@@ -162,6 +168,17 @@ class TestServeView(TestCase):
         # should only render the content of includes/event_listing.html, not the whole page
         self.assertNotContains(response, '<h1>Events</h1>')
         self.assertContains(response, '<a href="/events/christmas/">Christmas</a>')
+
+    def test_old_style_routing(self):
+        """
+        Test that route() methods that return an HttpResponse are correctly handled
+        """
+        response = self.client.get('/old-style-route/')
+        expected_page = PageWithOldStyleRouteMethod.objects.get(url_path='/home/old-style-route/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['self'], expected_page)
+        self.assertEqual(response.templates[0].name, 'tests/simple_page.html')
 
 
 class TestStaticSitePaths(TestCase):
