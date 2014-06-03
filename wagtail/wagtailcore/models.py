@@ -646,6 +646,14 @@ class Page(MP_Node, ClusterableModel, Indexed):
     def get_siblings(self, inclusive=True):
         return Page.objects.sibling_of(self, inclusive)
 
+    password_required_template = getattr(settings, 'PASSWORD_REQUIRED_TEMPLATE', 'wagtailcore/password_required.html')
+    def serve_password_required_response(self, request, form):
+        return TemplateResponse(request, self.password_required_template, {
+            'self': self,
+            'request': request,
+            'form': form,
+        })
+
 
 def get_navigation_menu_items():
     # Get all pages that appear in the navigation menu: ones which have children,
