@@ -646,6 +646,9 @@ class Page(MP_Node, ClusterableModel, Indexed):
     def get_siblings(self, inclusive=True):
         return Page.objects.sibling_of(self, inclusive)
 
+    def get_view_restrictions(self):
+        return PageViewRestriction.objects.filter(page__in=self.get_ancestors(inclusive=True))
+
     password_required_template = getattr(settings, 'PASSWORD_REQUIRED_TEMPLATE', 'wagtailcore/password_required.html')
     def serve_password_required_response(self, request, form, action_url):
         """
