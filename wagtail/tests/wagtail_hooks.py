@@ -12,7 +12,7 @@ def editor_js():
 hooks.register('insert_editor_js', editor_js)
 
 
-def block_googlebot(page, request):
+def block_googlebot(page, request, serve_args, serve_kwargs):
     if request.META.get('HTTP_USER_AGENT') == 'GoogleBot':
         return HttpResponse("<h1>bad googlebot no cookie</h1>")
 hooks.register('before_serve_page', block_googlebot)
