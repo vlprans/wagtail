@@ -181,7 +181,7 @@ def create(request, content_type_app_name, content_type_model_name, parent_page_
         'page_class': page_class,
         'parent_page': parent_page,
         'edit_handler': edit_handler,
-        'display_modes': page.preview_modes,
+        'preview_modes': page.preview_modes,
     })
 
 
@@ -266,7 +266,7 @@ def edit(request, page_id):
         'page': page,
         'edit_handler': edit_handler,
         'errors_debug': errors_debug,
-        'display_modes': page.preview_modes,
+        'preview_modes': page.preview_modes,
     })
 
 
@@ -325,7 +325,7 @@ def preview_on_edit(request, page_id):
         response = render(request, 'wagtailadmin/pages/edit.html', {
             'page': page,
             'edit_handler': edit_handler,
-            'display_modes': page.preview_modes,
+            'preview_modes': page.preview_modes,
         })
         response['X-Wagtail-Preview'] = 'error'
         return response
@@ -369,7 +369,7 @@ def preview_on_create(request, content_type_app_name, content_type_model_name, p
             'page_class': page_class,
             'parent_page': parent_page,
             'edit_handler': edit_handler,
-            'display_modes': page.preview_modes,
+            'preview_modes': page.preview_modes,
         })
         response['X-Wagtail-Preview'] = 'error'
         return response
