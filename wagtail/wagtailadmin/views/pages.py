@@ -314,7 +314,7 @@ def preview_on_edit(request, page_id):
         form.save(commit=False)
 
         preview_mode = request.GET.get('mode', page.default_preview_mode)
-        response = page.show_as_mode(preview_mode)
+        response = page.serve_preview(preview_mode)
 
         response['X-Wagtail-Preview'] = 'ok'
         return response
@@ -355,7 +355,7 @@ def preview_on_create(request, content_type_app_name, content_type_model_name, p
         page.set_url_path(parent_page)
 
         preview_mode = request.GET.get('mode', page.default_preview_mode)
-        response = page.show_as_mode(preview_mode)
+        response = page.serve_preview(preview_mode)
 
         response['X-Wagtail-Preview'] = 'ok'
         return response
