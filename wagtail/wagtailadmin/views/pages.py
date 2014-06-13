@@ -1,3 +1,5 @@
+import warnings
+
 from django.http import Http404, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.exceptions import ValidationError, PermissionDenied
@@ -6,6 +8,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.decorators import permission_required
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.utils.translation import ugettext as _
+from django.views.decorators.http import require_GET
 from django.views.decorators.vary import vary_on_headers
 
 from wagtail.wagtailadmin.edit_handlers import TabbedInterface, ObjectList
@@ -297,7 +300,7 @@ def delete(request, page_id):
 @permission_required('wagtailadmin.access_admin')
 def view_draft(request, page_id):
     page = get_object_or_404(Page, id=page_id).get_latest_revision_as_page()
-    return page.serve(request)
+    return page.serve_preview(page.dummy_request(), page.default_preview_mode)
 
 
 @permission_required('wagtailadmin.access_admin')
@@ -314,7 +317,19 @@ def preview_on_edit(request, page_id):
         form.save(commit=False)
 
         preview_mode = request.GET.get('mode', page.default_preview_mode)
-        response = page.serve_preview(preview_mode)
+
+        # Check the deprecated Page.show_as_mode method, as subclasses of Page
+        # might be overriding that to return a response
+        response = page.show_as_mode(preview_mode)
+        if response:
+            warnings.warn(
+                "Defining 'show_as_mode' on a page model is deprecated. Use 'serve_preview' instead",
+                DeprecationWarning
+            )
+        else:
+            # show_as_mode did not return a response, so go ahead and use the 'proper'
+            # serve_preview method
+            response = page.serve_preview(page.dummy_request(), preview_mode)
 
         response['X-Wagtail-Preview'] = 'ok'
         return response
@@ -355,7 +370,19 @@ def preview_on_create(request, content_type_app_name, content_type_model_name, p
         page.set_url_path(parent_page)
 
         preview_mode = request.GET.get('mode', page.default_preview_mode)
-        response = page.serve_preview(preview_mode)
+
+        # Check the deprecated Page.show_as_mode method, as subclasses of Page
+        # might be overriding that to return a response
+        response = page.show_as_mode(preview_mode)
+        if response:
+            warnings.warn(
+                "Defining 'show_as_mode' on a page model is deprecated. Use 'serve_preview' instead",
+                DeprecationWarning
+            )
+        else:
+            # show_as_mode did not return a response, so go ahead and use the 'proper'
+            # serve_preview method
+            response = page.serve_preview(page.dummy_request(), preview_mode)
 
         response['X-Wagtail-Preview'] = 'ok'
         return response
@@ -597,6 +624,7 @@ def reject_moderation(request, revision_id):
 
 
 @permission_required('wagtailadmin.access_admin')
+@require_GET
 def preview_for_moderation(request, revision_id):
     revision = get_object_or_404(PageRevision, id=revision_id)
     if not revision.page.permissions_for_user(request.user).can_publish():
@@ -610,4 +638,6 @@ def preview_for_moderation(request, revision_id):
 
     request.revision_id = revision_id
 
-    return page.serve(request)
+    # pass in the real user request rather than page.dummy_request(), so that request.user
+    # and request.revision_id will be picked up by the wagtail user bar
+    return page.serve_preview(request, page.default_preview_mode)

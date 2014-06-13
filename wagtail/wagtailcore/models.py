@@ -626,29 +626,38 @@ class Page(MP_Node, ClusterableModel, Indexed):
     def default_preview_mode(self):
         return self.preview_modes[0][0]
 
-    def serve_preview(self, mode_name):
+    def serve_preview(self, request, mode_name):
         """
-        Return an HTTP response for use in page previews, representative of the sort of
-        responses users would get when requesting this page. In normal circumstances
-        a page object only has one kind of response - namely, a rendered template with the
-        page content on it - in which case this translates to "return that one response".
+        Return an HTTP response for use in page previews. Normally this would be equivalent
+        to self.serve(request), since we obviously want the preview to be indicative of how
+        it looks on the live site. However, there are a couple of cases where this is not
+        appropriate, and custom behaviour is required:
 
-        By default, this is done by constructing a dummy HTTP request object and passing it
-        to page.serve(). However, this won't work if page classes have a custom page.serve()
-        method that expects additional required arguments - the preview mechanism has no way
-        of knowing which arguments to pass, so those page classes must implement their own
-        version of serve_preview too.
+        1) The page has custom routing logic that derives some additional required
+        args/kwargs to be passed to serve(). The routing mechanism is bypassed when
+        previewing, so there's no way to know what args we should pass. In such a case,
+        the page model needs to implement its own version of serve_preview.
 
-        mode_name will be an empty string, unless a custom preview_modes list has been defined
-        for this page class, in which case Wagtail will allow the user to specify one of those
-        modes when previewing. Wagtail does not care what those modes mean - it's up to the
-        implementation of serve_preview to do something meaningful with it.
+        2) The page has several different renderings that we would like to be able to see
+        when previewing - for example, a form page might have one rendering that displays
+        the form, and another rendering to display a landing page when the form is posted.
+        This can be done by setting a custom preview_modes list on the page model -
+        Wagtail will allow the user to specify one of those modes when previewing, and
+        pass the chosen mode_name to serve_preview so that the page model can decide how
+        to render it appropriately. (Page models that do not specify their own preview_modes
+        list will always receive an empty string as mode_name.)
+
+        Any templates rendered during this process should use the 'request' object passed
+        here - this ensures that request.user and other properties are set appropriately for
+        the wagtail user bar to be displayed. This request will always be a GET.
         """
-        return self.show_as_mode(mode_name)
+        return self.serve(request)
 
     def show_as_mode(self, mode_name):
-        # Deprecated name for serve_preview
-        return self.serve(self.dummy_request())
+        # Deprecated API for rendering previews. If this returns something other than None,
+        # we know that a subclass of Page has overridden this, and we should try to work with
+        # that response if possible.
+        return None
 
     def get_static_site_paths(self):
         """
