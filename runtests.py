@@ -85,7 +85,6 @@ if not settings.configured:
             'wagtail.wagtailredirects',
             'wagtail.wagtailforms',
             'wagtail.tests',
-            'wagtail.wagtailsearch.tests',
         ],
 
         # Using DatabaseCache to make sure that the cache is cleared between tests.
@@ -102,7 +101,8 @@ if not settings.configured:
         ),
         COMPRESS_ENABLED=False,  # disable compression so that we can run tests on the content of the compress tag
         WAGTAILSEARCH_BACKENDS=WAGTAILSEARCH_BACKENDS,
-        WAGTAIL_SITE_NAME='Test Site'
+        WAGTAIL_SITE_NAME='Test Site',
+        LOGIN_REDIRECT_URL='wagtailadmin_home',
     )
 
 

@@ -8,6 +8,7 @@ from wagtail.wagtailimages.edit_handlers import ImageChooserPanel
 from wagtail.wagtaildocs.edit_handlers import DocumentChooserPanel
 from wagtail.wagtailforms.models import AbstractEmailForm, AbstractFormField
 from wagtail.wagtailsnippets.models import register_snippet
+from wagtail.wagtailsearch.indexed import Indexed
 
 
 EVENT_AUDIENCE_CHOICES = (
@@ -256,16 +257,98 @@ FormPage.content_panels = [
 
 # Snippets
 
+# Snippets
+
 class Advert(models.Model):
-  url = models.URLField(null=True, blank=True)
-  text = models.CharField(max_length=255)
+    url = models.URLField(null=True, blank=True)
+    text = models.CharField(max_length=255)
 
-  panels = [
-    FieldPanel('url'),
-    FieldPanel('text'),
-  ]
+    panels = [
+        FieldPanel('url'),
+        FieldPanel('text'),
+    ]
 
-  def __unicode__(self):
-    return self.text
+    def __unicode__(self):
+        return self.text
+
 
 register_snippet(Advert)
+
+
+# AlphaSnippet and ZuluSnippet are for testing ordering of
+# snippets when registering.  They are named as such to ensure
+# thier ordering is clear.  They are registered during testing
+# to ensure specific [in]correct register ordering
+
+# AlphaSnippet is registered during TestSnippetOrdering
+class AlphaSnippet(models.Model):
+    text = models.CharField(max_length=255)
+
+    def __unicode__(self):
+        return self.text
+
+
+# ZuluSnippet is registered during TestSnippetOrdering
+class ZuluSnippet(models.Model):
+    text = models.CharField(max_length=255)
+
+    def __unicode__(self):
+        return self.text
+
+
+# MODELS FOR TESTING WAGTAILSEARCH
+
+
+class SearchTest(models.Model, Indexed):
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+    live = models.BooleanField(default=False)
+    published_date = models.DateField(null=True)
+
+    search_fields = {
+        'title': dict(partial_match=True),
+        'content': dict(),
+        'callable_indexed_field': dict()
+    }
+    search_filter_fields = ['title', 'live', 'published_date']
+
+    def callable_indexed_field(self):
+        return "Callable"
+
+
+class SearchTestChild(SearchTest):
+    subtitle = models.CharField(max_length=255, null=True, blank=True)
+    extra_content = models.TextField()
+
+    search_fields = {
+        'subtitle': dict(partial_match=True),
+        'extra_content': dict(),
+    }
+
+
+class SearchTestOldConfig(models.Model, Indexed):
+    """
+    This tests that the Indexed class can correctly handle models that
+    use the old "indexed_fields" configuration format.
+    """
+    indexed_fields = {
+        # A search field with predictive search and boosting
+        'title': {
+            'type': 'string',
+            'analyzer': 'edgengram_analyzer',
+            'boost': 100,
+        },
+
+        # A filter field
+        'live': {
+            'type': 'boolean',
+            'index': 'not_analyzed',
+        },
+    }
+
+class SearchTestOldConfigList(models.Model, Indexed):
+    """
+    This tests that the Indexed class can correctly handle models that
+    use the old "indexed_fields" configuration format using a list.
+    """
+    indexed_fields = ['title', 'content']

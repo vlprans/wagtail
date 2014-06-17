@@ -2,7 +2,20 @@ Changelog
 =========
 
 0.4 (xx.xx.20xx)
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
+ * Added 'original' as a resizing rule supported by the 'image' tag
+ * Hallo.js updated to version 1.0.4
+ * Snippets are now ordered alphabetically
+ * Removed the "More" section from the admin menu
+ * Added pagination to page listings in admin
+  * Search: Added search_fields/search_filter_fields settings (with backwards compatibility with old indexed_fields setting)
+ * Search: Queries now operate on querysets to allow more complex filtering
+ * Search: ElasticSearch backend now uses elasticsearch-py instead of ElasticUtils/pyelasticsearch
+ * Search: ElasticSearch now indexes fields with correct type (eg, IntegerField now indexed as an integer)
+ * Search: Improved ElasticSearch backend (many more unit tests, results caching)
+ * Fix: Animated GIFs are now coalesced before resizing
+ * Fix: Wand backend clones images before modifying them
+ * Fix: Admin breadcrumb now positioned correctly on mobile
 
 0.3.1 (03.06.2014)
 ~~~~~~~~~~~~~~~~~~
@@ -10,17 +23,13 @@ Changelog
  * Fix: Ensure that url_path is populated when previewing a newly created page, to avoid unnecessarily taking the above fallback.
  * Fix: Deleting an item from an InlinePanel, then generating a validation error on saving, no longer causes the deleted item to confusingly reappear with an error of its own.
 
+
 0.3 (28.05.2014)
 ~~~~~~~~~~~~~~~~
  * Added toolbar to allow logged-in users to add and edit pages from the site front-end
  * Support for alternative image processing backends such as Wand, via the WAGTAILIMAGES_BACKENDS setting
  * Added support for generating static sites using django-medusa
  * Added custom Query set for Pages with some handy methods for querying pages
- * Search: Added search_fields/search_filter_fields settings (with backwards compatibility with old indexed_fields setting)
- * Search: Queries now operate on querysets to allow more complex filtering
- * Search: ElasticSearch backend now uses elasticsearch-py instead of ElasticUtils/pyelasticsearch
- * Search: ElasticSearch now indexes fields with correct type (eg, IntegerField now indexed as an integer)
- * Search: Improved ElasticSearch backend (many more unit tests, results caching)
  * Added 'wagtailforms' module for creating form pages on a site, and handling form submissions
  * Editor's guide documentation
  * Expanded developer documentation
